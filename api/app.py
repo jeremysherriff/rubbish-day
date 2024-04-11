@@ -90,54 +90,50 @@ def rubbish_day():
 
     soup = BeautifulSoup(response.content, 'html.parser')
     addressBlock = soup.find_all(attrs={'class': 'm-b-2'})
-    cardBlock = soup.find_all(attrs={'class': 'card-block'})
-    householdBlock = None
-    for block in cardBlock :
-        try :
-            blockId = block['id']
-            if 'HouseholdBlock' in blockId :
-                householdBlock = block
-        except KeyError :
-            pass
-    if householdBlock :
-        if debugmode :
-            app.logger.debug(scriptName+': > Found collection information')
-    else :
-        app.logger.error(scriptName+': > Could not find collection information, exiting with no output')
-        return json.dumps(output)
-
-    links = householdBlock.find_all(attrs={'class': 'links'})
-
-    # Current collection cycle
-    output['value'] = links[0].find(attrs={'class':'m-r-1'}).string
+    collectionInfo  = soup.find_all(attrs={'class': 'collectionDayDate'})
     
-    # Address details
+    rubbishInfo = collectionInfo[0]
+    foodscrapsInfo = collectionInfo[1]
+    recycleInfo = collectionInfo[2]
+    
+    # RUBBISH INFO
+    rubbishDate = rubbishInfo.find("strong").get_text()
+    if debugmode :
+        app.logger.debug(scriptName+": > INFO: Rubbish Collection info: "+str(rubbishInfo)+'\n')
+        app.logger.debug(scriptName+": > INFO: Next rubbish collection date is -  "+str(rubbishDate)+'\n')
+    
+    # FOODSCRAPS INFO
+    foodscrapsDate = foodscrapsInfo.find("strong").get_text()
+    if debugmode :
+        app.logger.debug(scriptName+": > INFO: Foodscraps Collection info: "+str(foodscrapsInfo)+'\n')
+        app.logger.debug(scriptName+": > INFO: Next foodscraps collection date is -  "+str(foodscrapsDate)+'\n')
+    
+    # RECYCLE INFO
+    recycleDate = recycleInfo.find("strong").get_text()
+    if debugmode :
+        app.logger.debug(scriptName+": > INFO: Recycle Collection info: "+str(recycleInfo)+'\n')
+        app.logger.debug(scriptName+": > INFO: Next recycle collection date is "+str(recycleDate)+'\n')
+    
+    # ADDRESS INFO
+    if debugmode :
+        app.logger.debug(scriptName+": > INFO: Address is "+str(addressBlock[0].string)+'\n')
+    
+    output = {}
+    
+    output['datetime'] = datetime.strptime(rubbishDate+datetime.now().astimezone().strftime(' 07 %Y %z'), '%A %d %B %H %Y %z').strftime('%Y-%m-%dT%H:%M:%S%z')
     output['address'] = addressBlock[0].string
+    output['data_retrieved_datetime'] = datetime.now().astimezone().strftime("%Y-%m-%dT%H:%M:%S%z")
     
-    # Debug attribute for visibility
-    output['debug'] = debugmode
-    
-    # Create a timestamp from the date, assume 7am and NZT
-    output['datetime'] = datetime.strptime(output['value']+datetime.now().astimezone().strftime(' 07 %Y %z'), '%A %d %B %H %Y %z').strftime('%Y-%m-%dT%H:%M:%S%z')
-    recycleBlock = links[0].find(attrs={'class':'icon-recycle'})
-    if recycleBlock :
+    if rubbishDate == recycleDate:
+        output['value'] = recycleDate
         output['collection_type'] = 'Recycle'
         output['icon'] = 'mdi:recycle'
+        app.logger.debug(scriptName+": > Collection type is Rubbish and Recycling"+'\n')
     else :
+        output['value'] = rubbishDate
         output['collection_type'] = 'Rubbish'
         output['icon'] = 'mdi:trash-can'
-
-    # Next collection cycle
-    recycleBlock = None
-    output['next_collection_date'] = links[1].find(attrs={'class':'m-r-1'}).string
-    output['next_collection_datetime'] = datetime.strptime(output['next_collection_date']+datetime.now().astimezone().strftime(' 07 %Y %z'), '%A %d %B %H %Y %z').strftime('%Y-%m-%dT%H:%M:%S%z')
-    recycleBlock = links[1].find(attrs={'class':'icon-recycle'})
-    if recycleBlock :
-        output['next_collection_type'] = 'Recycle'
-        output['next_collection_icon'] = 'mdi:recycle'
-    else :
-        output['next_collection_type'] = 'Rubbish'
-        output['next_collection_icon'] = 'mdi:trash-can'
-
-    # print(json.dumps(output))
+        app.logger.debug(scriptName+": > Collection type is Rubbish"+'\n')
+    
+    app.logger.debug(scriptName+': Rubbish collection information successfully fetched\n')
     return json.dumps(output)
